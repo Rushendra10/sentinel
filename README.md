@@ -1,36 +1,33 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sentinel
 
-## Getting Started
+**The clinician is the patient.** Sentinel is an agentic system that watches the data a hospital already generates (EHR activity, scheduling) plus the clinician's own private signals (wearable, personal health record), detects burnout **before it lands** — the record leads, the body confirms — then **acts**: drafts the note backlog, triages the inbox, renegotiates the schedule by voice, escalates with consent behind a hard privacy wall, and verifies the load actually dropped.
 
-First, run the development server:
+Built in one day at the Abridge × Anthropic × Lightspeed hackathon (July 18, 2026). **All data is synthetic**, seeded to published occupational-stress effect sizes; integrations are mocked interfaces mirroring real products (Epic Signal, QGenda, Apple HealthKit, pharmacy fill feeds).
+
+## Run it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # → http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Works fully offline out of the box (curated agent outputs). To run the agents live on Claude:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cp .env.example .env.local   # add your ANTHROPIC_API_KEY
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`DEMO_MODE=cached` forces offline mode even with a key.
 
-## Learn More
+## The demo
 
-To learn more about Next.js, take a look at the following resources:
+- `/` — the clinician's view: Load Index, top drivers, "Tell me more," talk to Sentinel (voice)
+- `/insights` — full trajectory, drivers by privacy tier, live agent feed (Reasoner vs. Skeptic), sign-off actions, the Care Plan
+- `/admin` — the CMO's view: roster risk, escalation inbox — and everything private locked away
+- Press **`d`** to toggle the demo timeline (scrub Jun 28 → Jul 25, jump to Trigger / Catch / Verified, switch personas)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Three cases ship in the data: **Dr. Chen** (lapsed personal prescription caught mid-crisis — intervention fires today), **Dr. Patel** (beta-blocker masking his wearable's strain signal — caught yesterday), **Dr. Okafor** (pure workload catch — loop already closed and verified, with zero personal records connected).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Honest claims
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Sentinel flags "a pattern consistent with elevated burnout risk" — never a diagnosis. See `docs/SPEC.md` for the full product spec and `docs/PLAN.md` for how it was built.
