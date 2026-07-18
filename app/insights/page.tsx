@@ -8,7 +8,6 @@ import {
   getClinician, getScoreSeries, getEventPins,
 } from '@/lib/api';
 import { effectiveScoreDay } from '@/lib/score/live';
-import { getLoopStatus } from '@/lib/coach';
 import { getCannedRun } from '@/lib/agents/canned';
 import { useDemoStore } from '@/lib/store';
 import { BRAND, DEMO } from '@/lib/branding';
@@ -26,7 +25,6 @@ import { ActionsPanel } from '@/components/insights/ActionsPanel';
 import { CarePlanCard } from '@/components/insights/CarePlanCard';
 import { VerificationCard } from '@/components/insights/VerificationCard';
 import { AgentFeed } from '@/components/feed/AgentFeed';
-import { LoopCard } from '@/components/home/LoopCard';
 
 export default function InsightsPage() {
   const clinicianId = useDemoStore((s) => s.clinicianId);
@@ -41,7 +39,6 @@ export default function InsightsPage() {
   const clinician = getClinician(clinicianId);
   // Same live-computed score as the home page — signing/approving here moves it.
   const scoreDay = effectiveScoreDay(clinicianId, currentDate, { takenBoosts, spikeTags, artifactStatus });
-  const loop = getLoopStatus(clinicianId, currentDate);
   const fullSeries = getScoreSeries(clinicianId);
   const allPins = getEventPins(clinicianId);
   const cannedRun = getCannedRun(clinicianId);
@@ -162,8 +159,7 @@ export default function InsightsPage() {
           </section>
         </main>
 
-        <aside className="space-y-4 lg:sticky lg:top-8 lg:h-fit">
-          <LoopCard loop={loop} />
+        <aside className="lg:sticky lg:top-8 lg:h-fit">
           <AgentFeed events={events} />
         </aside>
       </div>
