@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { ArrowRight, Lock } from 'lucide-react';
 import { getClinician, getScoreSeries } from '@/lib/api';
 import { effectiveScoreDay } from '@/lib/score/live';
-import { getBoostActions, getDataSources, getDriverFix, getHeroAction, getSpike, getTrendPhrase } from '@/lib/coach';
+import { getBoostActions, getContextLine, getDataSources, getDriverFix, getHeroAction, getSpike, getTrendPhrase } from '@/lib/coach';
 import { useDemoStore } from '@/lib/store';
 import { BRAND, TIER_META } from '@/lib/branding';
 import { formatDateLong, lastName } from '@/components/lib/format';
@@ -49,6 +49,7 @@ export default function Home() {
   const tierMeta = TIER_META[scoreDay.tier];
 
   const heroAction = getHeroAction(clinicianId, currentDate);
+  const contextLine = getContextLine(clinicianId, currentDate);
   const trendPhrase = getTrendPhrase(clinicianId, currentDate);
   const sources = getDataSources(clinicianId, currentDate);
   const boosts = getBoostActions(clinicianId, currentDate);
@@ -88,7 +89,10 @@ export default function Home() {
           <section className="order-1 mx-auto w-full max-w-2xl min-w-0 lg:order-2">
             <HeroCard scoreDay={scoreDay} action={heroAction} onVoice={() => setVoiceOpen(true)} />
 
-            <div className="mt-3 flex items-center gap-3 px-1">
+            {contextLine && (
+              <p className="mt-3 px-1 text-[13px] font-medium text-stone-600">{contextLine}</p>
+            )}
+            <div className="mt-2.5 flex items-center gap-3 px-1">
               <div className="w-24 shrink-0">
                 <Sparkline data={series} color={tierMeta.color} height={26} />
               </div>

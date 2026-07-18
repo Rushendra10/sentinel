@@ -51,10 +51,11 @@ export interface LoopStatus {
 
 // ————— phases —————
 
-type ChenPhase = 'baseline' | 'trigger' | 'strain' | 'act' | 'recovering' | 'verified';
+type ChenPhase = 'baseline' | 'trigger' | 'losses' | 'strain' | 'act' | 'recovering' | 'verified';
 function chenPhase(date: string): ChenPhase {
   if (date < '2026-07-07') return 'baseline';
-  if (date < '2026-07-09') return 'trigger';
+  if (date < '2026-07-08') return 'trigger';
+  if (date < '2026-07-11') return 'losses'; // the deaths (Jul 8, Jul 9) + aftermath
   if (date < '2026-07-18') return 'strain';
   if (date < '2026-07-19') return 'act';
   if (date < '2026-07-25') return 'recovering';
@@ -87,6 +88,20 @@ export function getHeroAction(clinicianId: string, date: string): CoachAction {
             'After-hours charting has risen three days straight (+112% vs your baseline). Clearing the backlog before rounds beats clearing it at midnight.',
           cta: { kind: 'done', label: 'Add to calendar', doneLabel: 'Added for 7:00 AM' },
         };
+      case 'losses':
+        return date === '2026-07-08'
+          ? {
+              title: 'You lost a patient today — step outside before your next block',
+              detail:
+                'I saw what you logged this afternoon, and your body registered it — HRV dipped within the hour. Fifteen minutes of daylight and a short walk are the fastest reset available to you right now.',
+              cta: { kind: 'done', label: 'Block 15 min outside', doneLabel: 'Blocked — this afternoon' },
+            }
+          : {
+              title: 'Two losses in 48 hours — get some daylight today',
+              detail:
+                'I saw both. Your body registered them too — HRV dipped overnight after each. Fifteen minutes outside in natural light, before 3 PM, is the fastest reset before your next block.',
+              cta: { kind: 'done', label: 'Block 15 min outside', doneLabel: 'Blocked — 2:30 PM' },
+            };
       case 'strain':
         return {
           title: 'Let Sentinel draft a coverage request',
@@ -409,10 +424,56 @@ export interface BoostItem extends Boost {
 }
 
 export function getBoostActions(clinicianId: string, date: string): BoostItem[] {
-  return boostCatalog(clinicianId, date).map((b) => ({
+  const items = boostCatalog(clinicianId, date).map((b) => ({
     ...b,
     impactPts: deltaPts(clinicianId, date, b.deltaT),
   }));
+  // In the aftermath of Chen's losses, the movement boost becomes a daylight reset —
+  // vitals management tuned to what actually happened, not generic wellness.
+  if (clinicianId === 'chen' && chenPhase(date) === 'losses') {
+    const walk = items.find((b) => b.id === 'walk-20');
+    if (walk) {
+      walk.label = '15 minutes outside, in daylight';
+      walk.sub = 'Natural light + a short walk — the fastest HRV reset after a hard stretch';
+      walk.ctaLabel = 'Block time';
+      walk.doneLabel = 'Blocked — 2:30 PM';
+    }
+  }
+  return items;
+}
+
+// ————— one warm context line under the hero — narrative, never numbers-first —————
+
+export function getContextLine(clinicianId: string, date: string): string | null {
+  if (clinicianId === 'chen') {
+    switch (chenPhase(date)) {
+      case 'baseline':
+        return null;
+      case 'trigger':
+        return 'After-hours charting rose three days straight — the record moved before your body did.';
+      case 'losses':
+        return date === '2026-07-08'
+          ? 'A loss on shift today · your body registered it · fourth day without a break'
+          : 'Two losses this week · your body registered both overnight · still no day off';
+      case 'strain':
+        return 'The record saw this on Jul 7 · your body confirmed it Jul 9 · Sentinel is watching both.';
+      case 'act':
+        return 'The record saw this coming Jul 7 · your body confirmed Jul 9 · today Sentinel acted.';
+      case 'recovering':
+        return 'Interventions landed Jul 18 · load is easing · verification runs Jul 25.';
+      case 'verified':
+        return 'Loop closed: after-hours down 61% · HRV recovering · one lighter week behind you.';
+    }
+  }
+  if (clinicianId === 'patel' && date >= '2026-07-17') {
+    return 'Your watch reads fine — your medication hides the strain. Sentinel corrects for it.';
+  }
+  if (clinicianId === 'okafor') {
+    if (date >= '2026-07-09') return 'Loop closed Jul 9 · recovery verified · no personal records ever needed.';
+    if (date >= '2026-07-02') return 'Relief in motion · coverage adjusted · two recovery days scheduled.';
+    return 'Two losses in 48 hours · day eleven without a break · Sentinel is escalating with your consent.';
+  }
+  return null;
 }
 
 // ————— unexplained spike → tag it (the wearable catch nobody logged) —————

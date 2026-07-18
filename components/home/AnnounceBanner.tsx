@@ -32,6 +32,7 @@ export function AnnounceBanner({ onOpenVoice }: { onOpenVoice: () => void }) {
   const [visible, setVisible] = useState(false);
   const [spoke, setSpoke] = useState(false);
   const clinicianId = useDemoStore((s) => s.clinicianId);
+  const currentDate = useDemoStore((s) => s.currentDate);
 
   useEffect(() => {
     function tryAnnounce() {
@@ -56,8 +57,9 @@ export function AnnounceBanner({ onOpenVoice }: { onOpenVoice: () => void }) {
     };
   }, []);
 
-  // The announcement is Chen's — never show it on another persona's page.
-  if (!visible || clinicianId !== 'chen') return null;
+  // The announcement is Chen's critical-day moment — never on another persona's
+  // page, and never while the timeline is scrubbed to a pre-critical date.
+  if (!visible || clinicianId !== 'chen' || currentDate < CRITICAL_DATE) return null;
 
   return (
     <div className="fixed left-1/2 top-20 z-30 w-[min(92vw,480px)] -translate-x-1/2 animate-[bannerSlideIn_360ms_cubic-bezier(0.16,1,0.3,1)]">

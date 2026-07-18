@@ -23,8 +23,9 @@ export function DataSourcesCard({
   onOpenPrivacy: () => void;
 }) {
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-stone-400">
+    // Deliberately chrome-less: this is quiet status, not a feature card.
+    <div className="px-2 pt-1 opacity-90">
+      <h3 className="text-[10px] font-semibold uppercase tracking-wide text-stone-400/80">
         Your data
       </h3>
       <ul className="mt-3 space-y-3">
