@@ -22,7 +22,7 @@ const CHEN_JUL18: Encounter[] = [
   },
   { id: 'chen-e11', time: '13:00', patient: 'Simone Baptiste', reason: 'Abdominal pain follow-up', acuity: 'moderate', flexible: false },
   {
-    id: 'chen-e12', time: '13:30', patient: 'Owen Whitfield', reason: 'Post-ED wound check',
+    id: 'chen-e12', time: '13:30', patient: 'Owen Whitcomb', reason: 'Post-ED wound check',
     acuity: 'low', flexible: true, note: 'Movable to Dr. Kim’s open slots tomorrow',
   },
   { id: 'chen-e13', time: '14:00', patient: 'Renata Silva', reason: 'Syncope follow-up', acuity: 'high', flexible: false },

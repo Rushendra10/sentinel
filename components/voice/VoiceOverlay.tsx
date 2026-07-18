@@ -403,7 +403,7 @@ function EffectPanel({
           onClick={onSendEmail}
           className="mt-3 rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800"
         >
-          Send
+          Send to Dr. Whitfield
         </button>
       )}
     </div>

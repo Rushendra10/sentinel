@@ -1,10 +1,8 @@
 // lib/agents/canned/conversations.ts — the three rehearsed voice/chat utterances from
 // SPEC §6. These are also the fuzzy-match fallback for /api/converse when there's no
-// live key. encounterIds reference lib/api.getSchedule('chen', '2026-07-18') — that
-// function is currently a data-workstream placeholder returning [], so real encounter
-// ids don't exist yet. Using 'enc-07' and 'enc-12' as the two flexible, low-acuity
-// follow-ups per the orchestrator's fallback instruction; reused across the alvarez and
-// budget effects so the two "already telehealth-consented" patients are the same people.
+// live key. encounterIds reference lib/api.getSchedule('chen', '2026-07-18'):
+// chen-e10 / chen-e12 are the two follow-ups noted movable to Dr. Kim's open slots;
+// chen-e1 / chen-e4 are the two telehealth-consented patients among the deferrals.
 
 import type { CannedConversation } from '../../types';
 
@@ -16,7 +14,7 @@ export const cannedConversations: CannedConversation[] = [
       reply: "Yes — keep her 4:30. I can move your two flexible, low-acuity follow-ups into Dr. Kim's open slots tomorrow; you'd be out by 6:15. Want me to?",
       effect: {
         kind: 'reschedule',
-        encounterIds: ['enc-07', 'enc-12'],
+        encounterIds: ['chen-e10', 'chen-e12'],
         summary: "Moved two low-acuity follow-ups to Dr. Kim's open slots tomorrow, so Rosa Alvarez keeps her 4:30 visit and you're still out by 6:15.",
       },
     },
@@ -30,7 +28,7 @@ export const cannedConversations: CannedConversation[] = [
         kind: 'budget',
         booked: 19,
         recommended: 14,
-        deferralIds: ['enc-03', 'enc-05', 'enc-07', 'enc-09', 'enc-12'],
+        deferralIds: ['chen-e1', 'chen-e2', 'chen-e4', 'chen-e6', 'chen-e8'],
         summary: 'Five low-acuity encounters flagged as safe deferrals for today; two are already telehealth-consented.',
       },
     },
@@ -39,7 +37,7 @@ export const cannedConversations: CannedConversation[] = [
     key: 'email',
     utterance: "Send an email to the department chief — let them know I'm close to burnout so they can adjust my shifts.",
     response: {
-      reply: "This draft includes only your workload data — consecutive days worked, the after-hours trend, and your note backlog. None of your health information leaves this room. Sending it to Dr. Whitfield now.",
+      reply: "Here's the draft. It includes only your workload data — consecutive days worked, the after-hours trend, and your note backlog. None of your health information leaves this room. Ready to send it to Dr. Whitfield?",
       effect: {
         kind: 'email',
         email: {
