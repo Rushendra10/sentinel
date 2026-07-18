@@ -423,23 +423,110 @@ export interface BoostItem extends Boost {
   impactPts: number; // computed via the engine's own k + weights, never hardcoded
 }
 
-export function getBoostActions(clinicianId: string, date: string): BoostItem[] {
-  const items = boostCatalog(clinicianId, date).map((b) => ({
-    ...b,
-    impactPts: deltaPts(clinicianId, date, b.deltaT),
-  }));
-  // In the aftermath of Chen's losses, the movement boost becomes a daylight reset —
-  // vitals management tuned to what actually happened, not generic wellness.
-  if (clinicianId === 'chen' && chenPhase(date) === 'losses') {
-    const walk = items.find((b) => b.id === 'walk-20');
-    if (walk) {
-      walk.label = '15 minutes outside, in daylight';
-      walk.sub = 'Natural light + a short walk — the fastest HRV reset after a hard stretch';
-      walk.ctaLabel = 'Block time';
-      walk.doneLabel = 'Blocked — 2:30 PM';
+// The three boost MECHANICS (movement / breathing / sleep) and their score math live
+// in lib/score/live.ts and adapt numerically to each day's raw terms. The COPY below
+// adapts narratively: same levers, re-voiced around what has actually happened to this
+// doctor by this date. Order = relevance; the first item leads the row.
+interface BoostCopy {
+  id: 'walk-20' | 'reset-90' | 'lights-1030';
+  label: string;
+  sub: string;
+  ctaLabel?: string;
+  doneLabel?: string;
+}
+
+const MAINTENANCE_TRIO: BoostCopy[] = [
+  { id: 'walk-20', label: 'Morning daylight before your shift', sub: 'Ten minutes of outdoor light anchors your circadian rhythm' },
+  { id: 'lights-1030', label: 'Hold your wind-down — lights out by 10:30', sub: 'Your sleep is solid; protect the streak' },
+  { id: 'reset-90', label: 'Two slow breaths between patients', sub: 'Keeps vagal tone topped up on routine days' },
+];
+
+function boostCopyFor(clinicianId: string, date: string): BoostCopy[] {
+  if (clinicianId === 'chen') {
+    switch (chenPhase(date)) {
+      case 'baseline':
+        return MAINTENANCE_TRIO;
+      case 'trigger':
+        return [
+          { id: 'walk-20', label: '20-minute walk after tonight’s shift', sub: 'Three rising days in the record — movement blunts the stress curve early' },
+          { id: 'lights-1030', label: 'Lights out by 10:30 tonight', sub: 'Sleep is your first line of defense while the load climbs' },
+          { id: 'reset-90', label: '90-second paced breathing before your next block', sub: 'Fastest lever on vagal tone' },
+        ];
+      case 'losses':
+        return [
+          { id: 'walk-20', label: '15 minutes outside, in daylight', sub: 'Natural light + a short walk — the fastest reset after a loss', ctaLabel: 'Block time', doneLabel: 'Blocked — 2:30 PM' },
+          { id: 'reset-90', label: '90 seconds of paced breathing before you go back in', sub: 'Grief sits in the nervous system — this is the release valve' },
+          { id: 'lights-1030', label: 'Lights out by 10:00 tonight', sub: 'Your HRV dipped after each hard day — sleep is how it refills' },
+        ];
+      case 'strain':
+        return [
+          { id: 'lights-1030', label: 'Lights out by 10:00 — sleep debt is compounding', sub: 'You’re averaging under six hours; tonight matters more than the gym' },
+          { id: 'walk-20', label: 'Daylight walk at lunch — 15 minutes', sub: 'HRV has run below your baseline for a week; light + movement pull it back' },
+          { id: 'reset-90', label: 'Breathing reset before the 3 PM block', sub: 'Your hardest stretch of the day — walk in calm' },
+        ];
+      case 'act':
+        return [
+          { id: 'walk-20', label: 'Block a 20-min walk tomorrow, 7:00 AM', sub: 'Restorative movement credits your recovery term' },
+          { id: 'reset-90', label: '90-second paced breathing before your next block', sub: 'Fastest lever on suppressed vagal tone' },
+          { id: 'lights-1030', label: 'Lights out by 10:30 tonight', sub: 'Projected against your sleep-debt term' },
+        ];
+      case 'recovering':
+        return [
+          { id: 'walk-20', label: 'Morning daylight walk — cement the rebound', sub: 'Your HRV is climbing back; light keeps it moving' },
+          { id: 'lights-1030', label: 'Hold the 10:30 lights-out streak', sub: 'Two good nights so far — a third locks it in' },
+          { id: 'reset-90', label: 'One breathing reset per shift', sub: 'Maintenance dose for a recovering nervous system' },
+        ];
+      case 'verified':
+        return [
+          { id: 'walk-20', label: 'Keep the daylight habit', sub: 'It carried your HRV from 27 to 36 ms — don’t stop now' },
+          { id: 'lights-1030', label: 'Push sleep toward 7.5 hours', sub: 'You’re back to 6.9 — the last half hour is the difference' },
+          { id: 'reset-90', label: 'Two slow breaths between patients', sub: 'Cheap insurance on a good week' },
+        ];
     }
   }
-  return items;
+
+  if (clinicianId === 'patel') {
+    if (date < '2026-07-17') return MAINTENANCE_TRIO;
+    return [
+      { id: 'lights-1030', label: 'Lights out by 10:30 tonight', sub: 'You’re at 6.0 hours — sleep is the strain your watch can’t hide' },
+      { id: 'walk-20', label: '10-minute walk between rounding blocks', sub: 'A heavy census chains you to the chair — movement breaks the cycle' },
+      { id: 'reset-90', label: 'Breathing reset before the admissions huddle', sub: 'Your recalibrated strain peaks mid-morning' },
+    ];
+  }
+
+  if (clinicianId === 'okafor') {
+    switch (okaforPhase(date)) {
+      case 'crisis':
+        return [
+          { id: 'walk-20', label: '15 minutes outside, in daylight', sub: 'Two losses in 48 hours — light and movement are the fastest reset', ctaLabel: 'Block time' },
+          { id: 'reset-90', label: '90 seconds of paced breathing before you go back in', sub: 'Grief sits in the nervous system — this is the release valve' },
+          { id: 'lights-1030', label: 'Lights out by 10:00 tonight', sub: 'Day eleven — sleep is the only recovery you control tonight' },
+        ];
+      case 'relief':
+        return [
+          { id: 'walk-20', label: 'Daylight walk on your recovery day', sub: 'Friday is yours — spend some of it outside' },
+          { id: 'lights-1030', label: 'Catch-up sleep — no alarm on your day off', sub: 'Your body has a week of debt to repay' },
+          { id: 'reset-90', label: 'One breathing reset per shift', sub: 'A bridge until the coverage relief lands' },
+        ];
+      case 'closed':
+        return [
+          { id: 'walk-20', label: 'Keep the morning light habit', sub: 'It helped carry your HRV back to baseline' },
+          { id: 'lights-1030', label: 'Hold your wind-down routine', sub: 'Sleep is back — protect it' },
+          { id: 'reset-90', label: 'Two slow breaths between patients', sub: 'Maintenance for a recovered nervous system' },
+        ];
+    }
+  }
+
+  return MAINTENANCE_TRIO;
+}
+
+export function getBoostActions(clinicianId: string, date: string): BoostItem[] {
+  const mechanics = new Map(boostCatalog(clinicianId, date).map((b) => [b.id, b]));
+  return boostCopyFor(clinicianId, date).flatMap((copy) => {
+    const mech = mechanics.get(copy.id);
+    if (!mech) return [];
+    return [{ ...mech, ...copy, impactPts: deltaPts(clinicianId, date, mech.deltaT) }];
+  });
 }
 
 // ————— one warm context line under the hero — narrative, never numbers-first —————

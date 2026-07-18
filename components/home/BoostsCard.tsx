@@ -74,9 +74,15 @@ export function BoostsCard({ boosts, spike }: { boosts: BoostItem[]; spike: Spik
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-stone-500 shadow-sm">
                   <Icon className="h-3.5 w-3.5" />
                 </span>
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
-                  {fmtPts(b.impactPts)}
-                </span>
+                {b.impactPts >= 0.75 ? (
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+                    {fmtPts(b.impactPts)}
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold text-stone-500">
+                    steadies you
+                  </span>
+                )}
               </div>
               <p className="mt-2 text-xs font-medium leading-snug text-stone-800">{b.label}</p>
               <p className="mt-0.5 flex-1 text-[11px] leading-snug text-stone-400">{b.sub}</p>
