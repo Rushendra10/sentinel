@@ -11,20 +11,21 @@ const SEVERITY_BAR: Record<1 | 2 | 3, string> = {
   3: 'bg-red-400',
 };
 
-export function DriverCard({ driver }: { driver: Driver }) {
+export function DriverCard({ driver, footer }: { driver: Driver; footer?: React.ReactNode }) {
   return (
-    <div className="flex gap-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-      <span className={`mt-0.5 w-1 shrink-0 rounded-full ${SEVERITY_BAR[driver.severity]}`} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-3">
-          <p className="font-medium text-stone-900 leading-snug">{driver.label}</p>
-        </div>
-        <p className="mt-0.5 text-sm text-stone-500 leading-snug">{driver.detail}</p>
-        <div className="mt-2.5 flex items-center gap-2">
-          <span className="text-xs font-medium text-stone-400">{driver.deltaVsBaseline}</span>
-          <TierChip tierKey={driver.tier} />
+    <div className="rounded-2xl border border-stone-200 bg-white shadow-sm">
+      <div className="flex gap-3 p-4">
+        <span className={`mt-0.5 w-1 shrink-0 rounded-full ${SEVERITY_BAR[driver.severity]}`} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-3">
+            <p className="font-medium text-stone-900 leading-snug">{driver.label}</p>
+            <TierChip tierKey={driver.tier} />
+          </div>
+          <p className="mt-0.5 text-sm text-stone-500 leading-snug">{driver.detail}</p>
+          <p className="mt-2 text-xs font-medium text-stone-400">{driver.deltaVsBaseline}</p>
         </div>
       </div>
+      {footer && <div className="border-t border-stone-100 px-4 py-2.5">{footer}</div>}
     </div>
   );
 }

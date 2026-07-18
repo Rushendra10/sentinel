@@ -17,11 +17,13 @@ export function ScoreRing({
   tier,
   trajectory,
   size = 260,
+  compact = false,
 }: {
   loadIndex: number;
   tier: RiskTier;
   trajectory: 'rising' | 'flat' | 'falling';
   size?: number;
+  compact?: boolean;
 }) {
   const meta = TIER_META[tier];
   const Traj = TRAJECTORY_META[trajectory].icon;
@@ -62,20 +64,24 @@ export function ScoreRing({
           }}
         />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
-        <span className="text-6xl font-semibold tabular-nums tracking-tight text-stone-900">
+      <div className={`absolute inset-0 flex flex-col items-center justify-center ${compact ? 'gap-0.5' : 'gap-1.5'}`}>
+        <span
+          className={`font-semibold tabular-nums tracking-tight text-stone-900 ${compact ? 'text-4xl' : 'text-6xl'}`}
+        >
           {loadIndex}
         </span>
         <span
-          className="rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide"
+          className={`rounded-full font-semibold uppercase tracking-wide ${compact ? 'px-2 py-0.5 text-[9px]' : 'px-3 py-1 text-xs'}`}
           style={{ backgroundColor: meta.soft, color: meta.color }}
         >
           {meta.label}
         </span>
-        <span className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-stone-500">
-          <Traj className="h-3.5 w-3.5" style={{ color: meta.color }} strokeWidth={2.25} />
-          {TRAJECTORY_META[trajectory].label}
-        </span>
+        {!compact && (
+          <span className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-stone-500">
+            <Traj className="h-3.5 w-3.5" style={{ color: meta.color }} strokeWidth={2.25} />
+            {TRAJECTORY_META[trajectory].label}
+          </span>
+        )}
       </div>
     </div>
   );
