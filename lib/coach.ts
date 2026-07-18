@@ -5,6 +5,7 @@
 
 import type { ArtifactStatus } from './types';
 import { getScoreSeries } from './api';
+import { artifactDeltaT, boostCatalog, deltaPts, SPIKE_TAG_DELTA_T, type Boost } from './score/live';
 
 export interface CoachCta {
   label: string;
@@ -20,6 +21,8 @@ export interface CoachAction {
   title: string;
   detail: string;
   cta?: CoachCta;
+  /** Formula-computed projected score improvement, shown as "≈ −N pts". */
+  impactPts?: number;
 }
 
 export interface DriverFix {
@@ -97,6 +100,11 @@ export function getHeroAction(clinicianId: string, date: string): CoachAction {
           detail:
             'Signing takes about six minutes and clears tonight’s after-hours charting. Your refill and Thursday’s recovery block are staged below.',
           cta: { kind: 'link', label: 'Review & sign', href: '/insights' },
+          impactPts: deltaPts(
+            'chen',
+            date,
+            artifactDeltaT('chen', 'chen-art-note-v1', date) + artifactDeltaT('chen', 'chen-art-note-v2', date),
+          ),
         };
       case 'recovering':
         return {
@@ -135,6 +143,7 @@ export function getHeroAction(clinicianId: string, date: string): CoachAction {
         artifactId: 'patel-art-cap',
         targetStatus: 'approved',
       },
+      impactPts: deltaPts('patel', date, artifactDeltaT('patel', 'patel-art-cap', date)),
     };
   }
 
@@ -334,7 +343,7 @@ export function getDataSources(clinicianId: string, date: string): DataSource[] 
   return [
     { name: 'EHR activity', note: 'Epic Signal · live', status: 'fresh' },
     { name: 'Schedule', note: 'QGenda · synced', status: 'fresh' },
-    { name: 'Apple Watch', note: 'Synced 6:40 AM', status: 'fresh' },
+    { name: 'Apple Watch', note: 'Synced 6:40 AM · recovery, sleep & movement feed your score', status: 'fresh' },
     { name: 'Health records', note: 'Pharmacy fills current', status: 'fresh' },
   ];
 }
@@ -395,6 +404,46 @@ export function getLoopStatus(clinicianId: string, date: string): LoopStatus {
       { label: 'Verify', note: 'Confirms the load dropped', date: date, state: 'scheduled' },
     ],
   };
+}
+
+// ————— quick wins (right rail): actions with formula-computed score impact —————
+
+export interface BoostItem extends Boost {
+  impactPts: number; // computed via the engine's own k + weights, never hardcoded
+}
+
+export function getBoostActions(clinicianId: string, date: string): BoostItem[] {
+  return boostCatalog(clinicianId, date).map((b) => ({
+    ...b,
+    impactPts: deltaPts(clinicianId, date, b.deltaT),
+  }));
+}
+
+// ————— unexplained spike → tag it (the wearable catch nobody logged) —————
+
+export interface SpikeCard {
+  id: string;
+  window: string;
+  detail: string;
+  question: string;
+  options: string[];
+  impactPts: number;
+}
+
+export function getSpike(clinicianId: string, date: string): SpikeCard | null {
+  // Chen, today: a strain spike with no movement and nothing on the schedule —
+  // detected from ingested wearable telemetry (HR + HRV + movement gate).
+  if (clinicianId === 'chen' && date === '2026-07-18') {
+    return {
+      id: 'chen-spike-0718',
+      window: '2:10 – 2:35 PM',
+      detail: 'HR 104 · HRV 52% below your baseline · no movement · nothing on your schedule',
+      question: 'Was it a code, a hard conversation, or something else?',
+      options: ['Code', 'Hard conversation', 'Unexpected admission', 'Something else'],
+      impactPts: deltaPts(clinicianId, date, SPIKE_TAG_DELTA_T),
+    };
+  }
+  return null;
 }
 
 // ————— trend, in words —————

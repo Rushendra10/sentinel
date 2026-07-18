@@ -17,6 +17,8 @@ interface DemoStore {
   rescheduledIds: string[]; // encounter ids moved by the agent
   emailDraft: InboxEmail | null; // escalation email awaiting confirm
   sentEmails: InboxEmail[]; // appear in the admin inbox
+  takenBoosts: Record<string, true>; // quick-win actions taken this session
+  spikeTags: Record<string, string>; // spikeId -> chosen tag ("explained" reclassification)
 
   setDate: (d: string) => void;
   setClinician: (id: string) => void;
@@ -26,6 +28,8 @@ interface DemoStore {
   applyReschedule: (ids: string[]) => void;
   setEmailDraft: (e: InboxEmail | null) => void;
   sendEmail: (e: InboxEmail) => void;
+  takeBoost: (id: string) => void;
+  tagSpike: (spikeId: string, tag: string) => void;
 }
 
 export const useDemoStore = create<DemoStore>((set) => ({
@@ -38,6 +42,8 @@ export const useDemoStore = create<DemoStore>((set) => ({
   rescheduledIds: [],
   emailDraft: null,
   sentEmails: [],
+  takenBoosts: {},
+  spikeTags: {},
 
   setDate: (d) => set({ currentDate: d }),
   setClinician: (id) => set({ clinicianId: id }),
@@ -50,4 +56,6 @@ export const useDemoStore = create<DemoStore>((set) => ({
   setEmailDraft: (e) => set({ emailDraft: e }),
   sendEmail: (e) =>
     set((s) => ({ sentEmails: [...s.sentEmails, e], emailDraft: null })),
+  takeBoost: (id) => set((s) => ({ takenBoosts: { ...s.takenBoosts, [id]: true } })),
+  tagSpike: (spikeId, tag) => set((s) => ({ spikeTags: { ...s.spikeTags, [spikeId]: tag } })),
 }));

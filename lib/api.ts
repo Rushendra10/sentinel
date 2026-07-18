@@ -19,6 +19,7 @@ import { eventPinsFor } from './score/eventPins';
 import { assemblePatelScore, assembleStandardScore, CHEN_TARGETS, OKAFOR_TARGETS } from './score/build';
 import type { ClinicianScoreData } from './score/build';
 import { scoreDayClamped, toAdminProfile, toAdminRosterRow } from './privacy/projection';
+import { computeRawWB, type RawLoad } from './score/engine';
 
 // ————————————————————————————————————————————————————————————————
 // Build once, at module load. Deterministic seeded data — identical every run.
@@ -85,6 +86,17 @@ export function getAdminRoster(date: string): AdminRosterRow[] {
 
 export function getAdminProfile(id: string, date: string): AdminProfile {
   return toAdminProfile(requireScoreData(id), date);
+}
+
+/** Raw W/B term breakdown for one day — the live-action layer uses this to compute
+ * honest score deltas by re-running the same formula on modified inputs. */
+export function getRawLoad(id: string, date: string): RawLoad {
+  const data = requireScoreData(id);
+  const first = data.dates[0];
+  const last = data.dates[data.dates.length - 1];
+  const clamped = date < first ? first : date > last ? last : date;
+  const idx = data.dates.indexOf(clamped);
+  return computeRawWB(data.series, Math.max(0, idx), data.clinician);
 }
 
 /** Compact pre-aggregated context for live LLM prompts — never raw day series. */

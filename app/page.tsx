@@ -6,8 +6,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Lock } from 'lucide-react';
-import { getClinician, getScoreDay, getScoreSeries } from '@/lib/api';
-import { getDataSources, getDriverFix, getHeroAction, getLoopStatus, getTrendPhrase } from '@/lib/coach';
+import { getClinician, getScoreSeries } from '@/lib/api';
+import { effectiveScoreDay } from '@/lib/score/live';
+import { getBoostActions, getDataSources, getDriverFix, getHeroAction, getSpike, getTrendPhrase } from '@/lib/coach';
 import { useDemoStore } from '@/lib/store';
 import { BRAND, TIER_META } from '@/lib/branding';
 import { formatDateLong, lastName } from '@/components/lib/format';
@@ -22,7 +23,7 @@ import { PrivacyFlipModal } from '@/components/home/PrivacyFlipModal';
 import { HeroCard } from '@/components/home/HeroCard';
 import { CoachCtaButton } from '@/components/home/CoachCtaButton';
 import { DataSourcesCard } from '@/components/home/DataSourcesCard';
-import { LoopCard } from '@/components/home/LoopCard';
+import { BoostsCard } from '@/components/home/BoostsCard';
 
 export default function Home() {
   const clinicianId = useDemoStore((s) => s.clinicianId);
@@ -30,8 +31,14 @@ export default function Home() {
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
 
+  const takenBoosts = useDemoStore((s) => s.takenBoosts);
+  const spikeTags = useDemoStore((s) => s.spikeTags);
+  const artifactStatus = useDemoStore((s) => s.artifactStatus);
+
   const clinician = getClinician(clinicianId);
-  const scoreDay = getScoreDay(clinicianId, currentDate);
+  // The displayed score is COMPUTED: engine output minus formula-derived credits
+  // for every action taken this session (boosts, spike tags, signed/approved work).
+  const scoreDay = effectiveScoreDay(clinicianId, currentDate, { takenBoosts, spikeTags, artifactStatus });
   const series = getScoreSeries(clinicianId)
     .filter((p) => p.date <= currentDate)
     .map((p) => p.loadIndex);
@@ -40,7 +47,8 @@ export default function Home() {
   const heroAction = getHeroAction(clinicianId, currentDate);
   const trendPhrase = getTrendPhrase(clinicianId, currentDate);
   const sources = getDataSources(clinicianId, currentDate);
-  const loop = getLoopStatus(clinicianId, currentDate);
+  const boosts = getBoostActions(clinicianId, currentDate);
+  const spike = getSpike(clinicianId, currentDate);
 
   const topDrivers = [...scoreDay.drivers]
     .sort((a, b) => b.severity - a.severity)
@@ -136,7 +144,7 @@ export default function Home() {
           </section>
 
           <aside className="order-3 lg:sticky lg:top-8 lg:h-fit">
-            <LoopCard loop={loop} />
+            <BoostsCard boosts={boosts} spike={spike} />
           </aside>
         </div>
       </main>

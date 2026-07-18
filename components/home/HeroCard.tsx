@@ -41,8 +41,13 @@ export function HeroCard({
             />
           </div>
         )}
-        <div className="mt-4 flex items-center gap-4">
+        <div className="mt-4 flex items-center gap-3">
           {action.cta && <CoachCtaButton cta={action.cta} solid />}
+          {action.impactPts !== undefined && action.impactPts >= 1 && (
+            <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-600">
+              ≈ −{Math.round(action.impactPts)} pts
+            </span>
+          )}
           <button
             onClick={onVoice}
             className="inline-flex items-center gap-1.5 text-xs font-medium text-stone-400 transition-colors hover:text-stone-600"
