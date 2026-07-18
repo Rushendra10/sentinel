@@ -7,7 +7,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { randomUUID } from 'crypto';
 import { DEMO } from '../branding';
-import { getAgentContext, getSchedule } from '../api';
+import { getAgentContext, getSchedule, getScoreDay } from '../api';
+import { getBoostActions, getSpike } from '../coach';
 import type { AgentEvent, Artifact, ArtifactType, CannedRun, ConverseReply } from '../types';
 import {
   ADVOCATE_SYSTEM_PROMPT,
@@ -139,10 +140,24 @@ const CONVERSE_TOOL: ToolDef = {
 // null on any failure (bad response shape, timeout, API error, network error).
 // ————————————————————————————————————————————————————————————————
 
-async function callTool<T>(system: string, userContent: string, tool: ToolDef): Promise<T | null> {
+async function callTool<T>(
+  system: string,
+  userContent: string,
+  tool: ToolDef,
+  opts?: { priorTurns?: { role: 'user' | 'assistant'; content: string }[]; timeoutMs?: number },
+): Promise<T | null> {
   if (!hasLiveKey()) return null;
   try {
     const client = getClient();
+    // Merge consecutive same-role turns so the API's strict alternation always holds.
+    const turns: { role: 'user' | 'assistant'; content: string }[] = [];
+    for (const t of [...(opts?.priorTurns ?? []), { role: 'user' as const, content: userContent }]) {
+      const last = turns[turns.length - 1];
+      if (last && last.role === t.role) last.content += `\n\n${t.content}`;
+      else turns.push({ ...t });
+    }
+    if (turns[0]?.role !== 'user') turns.unshift({ role: 'user', content: '(conversation begins)' });
+
     const response = await client.messages.create(
       {
         model: MODEL,
@@ -150,9 +165,9 @@ async function callTool<T>(system: string, userContent: string, tool: ToolDef): 
         system,
         tools: [tool as unknown as Anthropic.Tool],
         tool_choice: { type: 'tool', name: tool.name },
-        messages: [{ role: 'user', content: userContent }],
+        messages: turns,
       },
-      { timeout: TIMEOUT_MS },
+      { timeout: opts?.timeoutMs ?? TIMEOUT_MS },
     );
     const block = response.content.find(
       (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === tool.name,
@@ -254,16 +269,43 @@ interface ConverseOut {
   redactionIncluded?: string[]; redactionExcluded?: string[]; summary?: string;
 }
 
-/** One live Claude call with getSchedule + getAgentContext folded into the user turn.
- * Returns null (fall back to fuzzy-matched canned reply) on missing key, DEMO_MODE=cached,
- * or any failure. */
-export async function converse(clinicianId: string, message: string): Promise<ConverseReply | null> {
+export interface ConverseTurn { role: 'user' | 'assistant'; text: string }
+
+/** One live Claude call that reasons over EVERYTHING Sentinel knows about this
+ * clinician on this timeline date: schedule, compact aggregates, every driver
+ * (all tiers — this is the clinician's own private side), any detected spike,
+ * and the quick-win catalog. Multi-turn via `history`. Returns null (fall back
+ * to fuzzy-matched canned reply) on missing key, DEMO_MODE=cached, or failure. */
+export async function converse(
+  clinicianId: string,
+  message: string,
+  date: string = DEMO.today,
+  history: ConverseTurn[] = [],
+): Promise<ConverseReply | null> {
   if (!hasLiveKey()) return null;
   try {
-    const schedule = getSchedule(clinicianId, DEMO.today);
-    const context = getAgentContext(clinicianId, DEMO.today);
-    const userContent = JSON.stringify({ clinicianId, schedule, context, message });
-    const out = await callTool<ConverseOut>(CONVERSE_SYSTEM_PROMPT, userContent, CONVERSE_TOOL);
+    const scoreDay = getScoreDay(clinicianId, date);
+    const doctorContext = {
+      date,
+      context: getAgentContext(clinicianId, date),
+      score: { loadIndex: scoreDay.loadIndex, tier: scoreDay.tier, trajectory: scoreDay.trajectory },
+      drivers: scoreDay.drivers.map((d) => ({
+        tier: d.tier, label: d.label, detail: d.detail, deltaVsBaseline: d.deltaVsBaseline,
+      })),
+      adjustment: scoreDay.adjustment ?? null,
+      unloggedSpike: getSpike(clinicianId, date),
+      quickWins: getBoostActions(clinicianId, date).map((b) => ({ label: b.label, impactPts: b.impactPts })),
+      todaysSchedule: getSchedule(clinicianId, date),
+    };
+    const userContent = JSON.stringify({ doctorContext, message });
+    const priorTurns = history
+      .filter((h) => (h.role === 'user' || h.role === 'assistant') && typeof h.text === 'string')
+      .slice(-10)
+      .map((h) => ({ role: h.role, content: h.text }));
+    const out = await callTool<ConverseOut>(CONVERSE_SYSTEM_PROMPT, userContent, CONVERSE_TOOL, {
+      priorTurns,
+      timeoutMs: 15000,
+    });
     if (!out) return null;
     return mapConverseReply(clinicianId, out);
   } catch {

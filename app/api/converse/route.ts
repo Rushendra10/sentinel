@@ -51,9 +51,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const parsed = body as { clinicianId?: unknown; message?: unknown } | null;
+  const parsed = body as {
+    clinicianId?: unknown; message?: unknown; date?: unknown;
+    history?: { role?: unknown; text?: unknown }[];
+  } | null;
   const clinicianId = parsed?.clinicianId;
   const message = parsed?.message;
+  const date = typeof parsed?.date === 'string' ? parsed.date : undefined;
+  const history = Array.isArray(parsed?.history)
+    ? parsed.history
+        .filter((h) => (h?.role === 'user' || h?.role === 'assistant') && typeof h?.text === 'string')
+        .map((h) => ({ role: h.role as 'user' | 'assistant', text: h.text as string }))
+    : [];
 
   if (typeof clinicianId !== 'string' || clinicianId.length === 0) {
     return NextResponse.json({ error: 'clinicianId is required' }, { status: 400 });
@@ -62,8 +71,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'message is required' }, { status: 400 });
   }
 
-  const live = await converseLive(clinicianId, message);
-  if (live) return NextResponse.json(live);
+  const live = await converseLive(clinicianId, message, date, history);
+  if (live) return NextResponse.json({ ...live, mode: 'live' });
 
-  return NextResponse.json(fuzzyMatch(message));
+  return NextResponse.json({ ...fuzzyMatch(message), mode: 'cached' });
 }

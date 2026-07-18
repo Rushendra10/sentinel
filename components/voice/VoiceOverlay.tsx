@@ -14,17 +14,35 @@ import { Waveform, type VoiceState } from './Waveform';
 
 interface SpeechResultLike { 0: { transcript: string }; isFinal: boolean }
 interface SpeechEventLike { resultIndex: number; results: ArrayLike<SpeechResultLike> }
+interface SpeechErrorLike { error?: string }
 interface SpeechRecognitionLike {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
   onresult: ((e: SpeechEventLike) => void) | null;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((e: SpeechErrorLike) => void) | null;
   start: () => void;
   stop: () => void;
 }
 type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
+function getRecognitionCtor(): SpeechRecognitionCtor | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const w = window as unknown as {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition;
+}
+
+const MIC_ERROR_TEXT: Record<string, string> = {
+  'not-allowed': 'Microphone blocked — allow mic access for this site, or type below.',
+  'service-not-allowed': 'Microphone blocked — allow mic access for this site, or type below.',
+  network: 'Speech service unreachable — type your message instead.',
+  'no-speech': 'Didn’t catch that — hold the mic and speak, or type below.',
+  'audio-capture': 'No microphone found — type your message instead.',
+};
 
 interface Message { role: 'user' | 'assistant'; text: string }
 
@@ -81,13 +99,13 @@ export function VoiceOverlay({ open, onClose }: { open: boolean; onClose: () => 
   const [emailSent, setEmailSent] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
   const [isHolding, setIsHolding] = useState(false);
-  const [micSupported] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    const w = window as unknown as { webkitSpeechRecognition?: SpeechRecognitionCtor };
-    return !!w.webkitSpeechRecognition;
-  });
+  const [micError, setMicError] = useState<string | null>(null);
+  const [lastMode, setLastMode] = useState<'live' | 'cached' | null>(null);
+  const [micSupported] = useState(() => !!getRecognitionCtor());
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const liveTranscriptRef = useRef('');
+  const pendingSendRef = useRef(false);
+  const endGuardRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -104,23 +122,26 @@ export function VoiceOverlay({ open, onClose }: { open: boolean; onClose: () => 
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
+      const history = messages.slice(-10); // prior turns, for multi-turn reasoning
       setMessages((m) => [...m, { role: 'user', text: trimmed }]);
       setInputText('');
       setLiveTranscript('');
+      setMicError(null);
       setVoiceState('thinking');
 
-      let reply: ConverseReply;
+      let reply: ConverseReply & { mode?: 'live' | 'cached' };
       try {
         const res = await fetch('/api/converse', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ clinicianId, message: trimmed }),
+          body: JSON.stringify({ clinicianId, message: trimmed, date: currentDate, history }),
         });
         if (!res.ok) throw new Error(`status ${res.status}`);
         reply = await res.json();
       } catch {
-        reply = matchCanned(trimmed);
+        reply = { ...matchCanned(trimmed), mode: 'cached' };
       }
+      setLastMode(reply.mode ?? 'cached');
 
       setMessages((m) => [...m, { role: 'assistant', text: reply.reply }]);
       setVoiceState('speaking');
@@ -133,13 +154,32 @@ export function VoiceOverlay({ open, onClose }: { open: boolean; onClose: () => 
         if (reply.effect.kind === 'email') setEmailDraft(reply.effect.email);
       }
     },
-    [clinicianId, applyReschedule, setEmailDraft],
+    [clinicianId, currentDate, messages, applyReschedule, setEmailDraft],
   );
 
+  // Finalize-and-send lives in onend, NOT on button release: Chrome delivers the
+  // final recognition results asynchronously AFTER stop() is called, so reading
+  // the transcript at mouse-up races the recognizer and often sends nothing.
+  const finalizeHold = useCallback(() => {
+    if (!pendingSendRef.current) return;
+    pendingSendRef.current = false;
+    if (endGuardRef.current) clearTimeout(endGuardRef.current);
+    recognitionRef.current = null;
+    const transcript = liveTranscriptRef.current.trim();
+    liveTranscriptRef.current = '';
+    setLiveTranscript('');
+    if (transcript) void sendMessage(transcript);
+    else {
+      setVoiceState('idle');
+      setMicError(MIC_ERROR_TEXT['no-speech']);
+    }
+  }, [sendMessage]);
+
   const startHold = () => {
-    const w = window as unknown as { webkitSpeechRecognition?: SpeechRecognitionCtor };
-    const Ctor = w.webkitSpeechRecognition;
+    const Ctor = getRecognitionCtor();
     if (!Ctor) return;
+    window.speechSynthesis?.cancel();
+    setMicError(null);
     const recognition = new Ctor();
     recognition.continuous = true;
     recognition.interimResults = true;
@@ -150,24 +190,32 @@ export function VoiceOverlay({ open, onClose }: { open: boolean; onClose: () => 
       liveTranscriptRef.current = transcript;
       setLiveTranscript(transcript);
     };
-    recognition.onerror = () => setIsHolding(false);
+    recognition.onerror = (e) => {
+      pendingSendRef.current = false;
+      setIsHolding(false);
+      setVoiceState('idle');
+      setMicError(MIC_ERROR_TEXT[e.error ?? ''] ?? 'Mic hiccup — try again, or type below.');
+    };
+    recognition.onend = finalizeHold;
     recognitionRef.current = recognition;
-    recognition.start();
-    setIsHolding(true);
-    setVoiceState('listening');
+    try {
+      recognition.start();
+      setIsHolding(true);
+      setVoiceState('listening');
+    } catch {
+      setMicError('Mic could not start — type your message instead.');
+    }
   };
 
   const endHold = () => {
     const recognition = recognitionRef.current;
     setIsHolding(false);
-    setVoiceState('idle');
     if (!recognition) return;
-    recognition.stop();
-    recognitionRef.current = null;
-    const transcript = liveTranscriptRef.current;
-    liveTranscriptRef.current = '';
-    setLiveTranscript('');
-    if (transcript.trim()) void sendMessage(transcript);
+    pendingSendRef.current = true;
+    setVoiceState('thinking');
+    recognition.stop(); // onend → finalizeHold sends the flushed transcript
+    // Safety net: if onend never fires (it can hang on flaky networks), force-finalize.
+    endGuardRef.current = setTimeout(finalizeHold, 1500);
   };
 
   if (!open) return null;
@@ -219,6 +267,19 @@ export function VoiceOverlay({ open, onClose }: { open: boolean; onClose: () => 
               </div>
             </div>
           ))}
+          {lastMode && messages.some((m) => m.role === 'assistant') && (
+            <div className="flex justify-start pl-1">
+              <span
+                className={`text-[10px] font-medium ${
+                  lastMode === 'live' ? 'text-emerald-600' : 'text-stone-400'
+                }`}
+              >
+                {lastMode === 'live'
+                  ? '✦ Reasoned live by Claude over your data'
+                  : 'Offline preview — live reasoning needs an API key'}
+              </span>
+            </div>
+          )}
           {isHolding && liveTranscript && (
             <div className="flex justify-end">
               <div className="max-w-[80%] rounded-2xl bg-stone-400/70 px-4 py-2.5 text-sm italic text-white">
@@ -245,6 +306,11 @@ export function VoiceOverlay({ open, onClose }: { open: boolean; onClose: () => 
           <div ref={transcriptEndRef} />
         </div>
 
+        {micError && (
+          <p className="mt-2 rounded-lg bg-amber-50 px-3 py-1.5 text-[11px] font-medium text-amber-700">
+            {micError}
+          </p>
+        )}
         <div className="mt-4 flex items-center gap-2">
           {micSupported && (
             <button
