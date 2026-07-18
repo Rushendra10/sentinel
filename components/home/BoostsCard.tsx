@@ -64,36 +64,36 @@ export function BoostsCard({ boosts, spike }: { boosts: BoostItem[]; spike: Spik
         </div>
       )}
 
-      <ul className="mt-3 space-y-3">
+      <ul className="mt-3 grid gap-3 sm:grid-cols-3">
         {boosts.map((b) => {
           const Icon = KIND_ICON[b.kind];
           const done = !!takenBoosts[b.id];
           return (
-            <li key={b.id} className="flex items-start gap-2.5">
-              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-stone-500">
-                <Icon className="h-3.5 w-3.5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium leading-snug text-stone-800">{b.label}</p>
-                <p className="mt-0.5 text-[11px] leading-snug text-stone-400">{b.sub}</p>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600">
-                    {fmtPts(b.impactPts)}
+            <li key={b.id} className="flex flex-col rounded-xl border border-stone-100 bg-stone-50/60 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-stone-500 shadow-sm">
+                  <Icon className="h-3.5 w-3.5" />
+                </span>
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+                  {fmtPts(b.impactPts)}
+                </span>
+              </div>
+              <p className="mt-2 text-xs font-medium leading-snug text-stone-800">{b.label}</p>
+              <p className="mt-0.5 flex-1 text-[11px] leading-snug text-stone-400">{b.sub}</p>
+              <div className="mt-2.5">
+                {done ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                    <Check className="h-3 w-3" strokeWidth={3} />
+                    {b.doneLabel}
                   </span>
-                  {done ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                      <Check className="h-3 w-3" strokeWidth={3} />
-                      {b.doneLabel}
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => takeBoost(b.id)}
-                      className="rounded-full border border-stone-300 bg-white px-2.5 py-0.5 text-[10px] font-semibold text-stone-600 transition-colors hover:border-stone-400 hover:bg-stone-50"
-                    >
-                      {b.ctaLabel}
-                    </button>
-                  )}
-                </div>
+                ) : (
+                  <button
+                    onClick={() => takeBoost(b.id)}
+                    className="rounded-full border border-stone-300 bg-white px-2.5 py-1 text-[10px] font-semibold text-stone-600 transition-colors hover:border-stone-400 hover:bg-stone-50"
+                  >
+                    {b.ctaLabel}
+                  </button>
+                )}
               </div>
             </li>
           );

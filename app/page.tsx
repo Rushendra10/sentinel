@@ -1,7 +1,11 @@
 // app/page.tsx — the clinician home. Design principle: help, don't inform.
-// One score, one recommended action (hero), each driver paired with its fix,
-// and the side rails carry data-source status + the agent's visible loop.
+// One score, one recommended action (hero), quick wins with computed impact,
+// and a left rail with the doctor's own devices.
 'use client';
+
+// The "What's driving this" driver+fix section is temporarily hidden while its
+// placement/portrayal is being redesigned — code intentionally kept, do not delete.
+const SHOW_DRIVERS = false;
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -92,38 +96,44 @@ export default function Home() {
             </div>
 
             <section className="mt-8">
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-400">
-                What&rsquo;s driving this, and what to do
-              </h2>
-              <div className="flex flex-col gap-3">
-                {topDrivers.length === 0 ? (
-                  <p className="rounded-2xl border border-stone-200 bg-white p-4 text-sm text-stone-400">
-                    Nothing is driving elevated load today — all signals are within your baseline.
-                  </p>
-                ) : (
-                  topDrivers.map((d) => {
-                    const fix = getDriverFix(clinicianId, d.id, currentDate);
-                    return (
-                      <DriverCard
-                        key={d.id}
-                        driver={d}
-                        footer={
-                          fix ? (
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="flex min-w-0 items-start gap-2 text-sm text-stone-700">
-                                <ArrowRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-stone-400" />
-                                <span className="leading-snug">{fix.text}</span>
-                              </p>
-                              {fix.cta && <CoachCtaButton cta={fix.cta} />}
-                            </div>
-                          ) : undefined
-                        }
-                      />
-                    );
-                  })
-                )}
-              </div>
+              <BoostsCard boosts={boosts} spike={spike} />
             </section>
+
+            {SHOW_DRIVERS && (
+              <section className="mt-8">
+                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-400">
+                  What&rsquo;s driving this, and what to do
+                </h2>
+                <div className="flex flex-col gap-3">
+                  {topDrivers.length === 0 ? (
+                    <p className="rounded-2xl border border-stone-200 bg-white p-4 text-sm text-stone-400">
+                      Nothing is driving elevated load today — all signals are within your baseline.
+                    </p>
+                  ) : (
+                    topDrivers.map((d) => {
+                      const fix = getDriverFix(clinicianId, d.id, currentDate);
+                      return (
+                        <DriverCard
+                          key={d.id}
+                          driver={d}
+                          footer={
+                            fix ? (
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="flex min-w-0 items-start gap-2 text-sm text-stone-700">
+                                  <ArrowRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-stone-400" />
+                                  <span className="leading-snug">{fix.text}</span>
+                                </p>
+                                {fix.cta && <CoachCtaButton cta={fix.cta} />}
+                              </div>
+                            ) : undefined
+                          }
+                        />
+                      );
+                    })
+                  )}
+                </div>
+              </section>
+            )}
 
             <div className="mt-9 flex flex-col items-center gap-4">
               <Link
@@ -143,9 +153,8 @@ export default function Home() {
             </div>
           </section>
 
-          <aside className="order-3 lg:sticky lg:top-8 lg:h-fit">
-            <BoostsCard boosts={boosts} spike={spike} />
-          </aside>
+          {/* right spacer keeps the center column truly centered */}
+          <aside className="order-3 hidden lg:block" aria-hidden />
         </div>
       </main>
 

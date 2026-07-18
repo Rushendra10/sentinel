@@ -319,32 +319,28 @@ export function getDriverFix(clinicianId: string, driverId: string, date: string
 
 // ————— data sources (left rail) —————
 
+// Two rows only, doctor-relevant: their wearable (different device per clinician,
+// with a synced-at time) and their calendar. EHR plumbing stays invisible.
 export function getDataSources(clinicianId: string, date: string): DataSource[] {
   if (clinicianId === 'patel') {
     return [
-      { name: 'EHR activity', note: 'Epic Signal · live', status: 'fresh' },
-      { name: 'Schedule', note: 'QGenda · synced', status: 'fresh' },
-      { name: 'Apple Watch', note: 'Readings adjusted for metoprolol', status: 'adjusted' },
-      { name: 'Health records', note: 'Medication list current', status: 'fresh' },
+      { name: 'Whoop', note: 'Synced at 7:15 AM', status: 'fresh' },
+      { name: 'Calendar', note: 'Last synced just now', status: 'fresh' },
     ];
   }
   if (clinicianId === 'okafor') {
     const watchStale = date >= '2026-07-17';
     return [
-      { name: 'EHR activity', note: 'Epic Signal · live', status: 'fresh' },
-      { name: 'Schedule', note: 'QGenda · synced', status: 'fresh' },
       watchStale
-        ? { name: 'Apple Watch', note: 'Not worn since Jul 16 — wear it to keep insights precise', status: 'stale' }
-        : { name: 'Apple Watch', note: 'Synced this morning', status: 'fresh' },
-      { name: 'Health records', note: 'Not connected · optional — Sentinel works without it', status: 'off' },
+        ? { name: 'Oura Ring', note: 'Not worn since Jul 16 — wear it to keep insights precise', status: 'stale' }
+        : { name: 'Oura Ring', note: 'Synced at 6:05 AM', status: 'fresh' },
+      { name: 'Calendar', note: 'Last synced 2 minutes ago', status: 'fresh' },
     ];
   }
   // chen + roster default
   return [
-    { name: 'EHR activity', note: 'Epic Signal · live', status: 'fresh' },
-    { name: 'Schedule', note: 'QGenda · synced', status: 'fresh' },
-    { name: 'Apple Watch', note: 'Synced 6:40 AM · recovery, sleep & movement feed your score', status: 'fresh' },
-    { name: 'Health records', note: 'Pharmacy fills current', status: 'fresh' },
+    { name: 'Apple Watch', note: 'Synced at 6:42 AM', status: 'fresh' },
+    { name: 'Calendar', note: 'Last synced 5 seconds ago', status: 'fresh' },
   ];
 }
 

@@ -3,7 +3,7 @@
 // Doubles as a quiet consent showcase (sources can be "Not connected · optional").
 'use client';
 
-import { Activity, CalendarDays, Watch, FileHeart, Lock } from 'lucide-react';
+import { CalendarDays, Watch, Lock } from 'lucide-react';
 import type { DataSource } from '@/lib/coach';
 
 const DOT: Record<DataSource['status'], string> = {
@@ -13,7 +13,7 @@ const DOT: Record<DataSource['status'], string> = {
   adjusted: 'bg-violet-500',
 };
 
-const ICONS = [Activity, CalendarDays, Watch, FileHeart];
+const ICONS = [Watch, CalendarDays];
 
 export function DataSourcesCard({
   sources,
