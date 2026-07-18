@@ -1,41 +1,28 @@
 // lib/agents/canned.ts — canned agent outputs: the demo's guaranteed-offline content.
-// SIGNATURES ARE FROZEN. The agent-service workstream replaces the placeholder
-// content below with the full, SPEC-faithful runs for chen / patel / okafor
-// and the three rehearsed conversations.
+// SIGNATURES ARE FROZEN: getCannedRun(clinicianId), getCannedConversations().
+// Content lives in lib/agents/canned/*.ts — one module per case, plus the three
+// rehearsed voice/chat conversations. See docs/SPEC.md §1, §5, §6.
 
 import type { CannedConversation, CannedRun } from '../types';
+import { chenArtifacts, chenEvents } from './canned/chen';
+import { patelArtifacts, patelEvents } from './canned/patel';
+import { okaforArtifacts, okaforEvents } from './canned/okafor';
+import { cannedConversations } from './canned/conversations';
 
-const placeholder: CannedRun = {
-  events: [
-    {
-      id: 'ev-1', ts: '2026-07-07T18:40:00-07:00', agent: 'sentinel', kind: 'finding',
-      text: 'Workload trajectory rising 3 consecutive days — after-hours charting and backlog trending up with 3 consecutive days worked.',
-      refs: ['After-hours 85 min', 'Backlog 6'],
-    },
-    {
-      id: 'ev-2', ts: '2026-07-18T09:00:00-07:00', agent: 'reasoner', model: 'claude-sonnet-5', kind: 'reasoning',
-      text: 'Primary driver: after-hours documentation, compounded by two patient deaths and fourteen consecutive days without recovery.',
-    },
-  ],
-  artifacts: [
-    {
-      id: 'art-care-plan', type: 'care_plan', title: 'Care Plan — Chen, Maya, MD', status: 'draft',
-      bodyMd: '**Placeholder** — replaced by the agent-service workstream.',
-    },
-  ],
+const RUNS: Record<string, CannedRun> = {
+  chen: { events: chenEvents, artifacts: chenArtifacts },
+  patel: { events: patelEvents, artifacts: patelArtifacts },
+  okafor: { events: okaforEvents, artifacts: okaforArtifacts },
 };
 
+/** Returns the pre-generated, SPEC-faithful agent run for a clinician. Unknown ids get an
+ * empty run rather than a throw — the roster's 11 other clinicians have no scripted run. */
 export function getCannedRun(clinicianId: string): CannedRun {
-  void clinicianId;
-  return placeholder;
+  return RUNS[clinicianId] ?? { events: [], artifacts: [] };
 }
 
+/** The three rehearsed voice/chat utterances from SPEC §6 — also the fuzzy-match
+ * fallback contract for POST /api/converse. */
 export function getCannedConversations(): CannedConversation[] {
-  return [
-    {
-      key: 'email',
-      utterance: 'Send an email to the department chief — let them know I am close to burnout so they can adjust my shifts.',
-      response: { reply: 'Placeholder — replaced by the agent-service workstream.' },
-    },
-  ];
+  return cannedConversations;
 }
