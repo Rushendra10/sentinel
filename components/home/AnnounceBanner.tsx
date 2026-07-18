@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Volume2, MessageCircle } from 'lucide-react';
+import { Volume2, MessageCircle, X } from 'lucide-react';
 import { useDemoStore } from '@/lib/store';
 
 const ANNOUNCE_LINE =
@@ -31,6 +31,7 @@ function speakAnnounce() {
 export function AnnounceBanner({ onOpenVoice }: { onOpenVoice: () => void }) {
   const [visible, setVisible] = useState(false);
   const [spoke, setSpoke] = useState(false);
+  const clinicianId = useDemoStore((s) => s.clinicianId);
 
   useEffect(() => {
     function tryAnnounce() {
@@ -55,10 +56,11 @@ export function AnnounceBanner({ onOpenVoice }: { onOpenVoice: () => void }) {
     };
   }, []);
 
-  if (!visible) return null;
+  // The announcement is Chen's — never show it on another persona's page.
+  if (!visible || clinicianId !== 'chen') return null;
 
   return (
-    <div className="fixed left-1/2 top-6 z-30 w-[min(92vw,480px)] -translate-x-1/2 animate-[bannerSlideIn_360ms_cubic-bezier(0.16,1,0.3,1)]">
+    <div className="fixed left-1/2 top-20 z-30 w-[min(92vw,480px)] -translate-x-1/2 animate-[bannerSlideIn_360ms_cubic-bezier(0.16,1,0.3,1)]">
       <div className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white/95 p-3.5 pl-4 shadow-xl backdrop-blur">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-500">
           <Volume2 className="h-4 w-4" />
@@ -72,6 +74,13 @@ export function AnnounceBanner({ onOpenVoice }: { onOpenVoice: () => void }) {
         >
           <MessageCircle className="h-3.5 w-3.5" />
           Talk to Sentinel
+        </button>
+        <button
+          onClick={() => setVisible(false)}
+          className="shrink-0 rounded-full p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600"
+          aria-label="Dismiss"
+        >
+          <X className="h-4 w-4" />
         </button>
       </div>
       {!spoke && (

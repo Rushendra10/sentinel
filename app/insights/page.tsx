@@ -115,7 +115,9 @@ export default function InsightsPage() {
             <DriverGroup tierKey="body" drivers={bodyDrivers} />
             <DriverGroup tierKey="personal" drivers={personalDrivers} />
             {workloadDrivers.length + bodyDrivers.length + personalDrivers.length === 0 && (
-              <p className="px-3 py-6 text-center text-sm text-stone-400">No drivers recorded for this date.</p>
+              <p className="px-3 py-6 text-center text-sm text-stone-400">
+                Nothing is driving elevated load today — all signals are within your baseline.
+              </p>
             )}
           </section>
 

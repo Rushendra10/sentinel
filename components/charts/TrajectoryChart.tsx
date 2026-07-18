@@ -110,29 +110,39 @@ export function TrajectoryChart({
             tick={{ fontSize: 11, fill: '#898781' }}
             axisLine={false}
             tickLine={false}
-            width={30}
+            width={36}
           />
           <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#c3c2b7', strokeWidth: 1 }} />
-          {pins.map((pin, i) => (
-            <ReferenceDot
-              key={`${pin.kind}-${pin.date}-${i}`}
-              x={pin.date}
-              y={pin.loadIndex}
-              r={5}
-              fill={PIN_META[pin.kind]?.color ?? '#78716c'}
-              stroke="#fcfcfb"
-              strokeWidth={2}
-              ifOverflow="visible"
-              label={{
-                value: pin.label,
-                position: i % 2 === 0 ? 'top' : 'bottom',
-                fontSize: 10,
-                fontWeight: 600,
-                fill: PIN_META[pin.kind]?.color ?? '#78716c',
-                offset: 10,
-              }}
-            />
-          ))}
+          {pins.map((pin, i) => {
+            // Only the four story-critical pins carry on-chart text; the rest are
+            // dots — their detail lives in the agent feed and the presenter's script.
+            const major = ['trigger', 'confirm', 'catch', 'verify'].includes(pin.kind);
+            const meta = PIN_META[pin.kind] ?? { color: '#78716c', label: pin.kind };
+            return (
+              <ReferenceDot
+                key={`${pin.kind}-${pin.date}-${i}`}
+                x={pin.date}
+                y={pin.loadIndex}
+                r={major ? 5 : 3.5}
+                fill={meta.color}
+                stroke="#fcfcfb"
+                strokeWidth={major ? 2 : 1.5}
+                ifOverflow="visible"
+                label={
+                  major
+                    ? {
+                        value: meta.label,
+                        position: pin.kind === 'trigger' || pin.kind === 'confirm' ? 'bottom' : 'top',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        fill: meta.color,
+                        offset: 10,
+                      }
+                    : undefined
+                }
+              />
+            );
+          })}
           <Line
             type="monotone"
             dataKey="loadIndex"
