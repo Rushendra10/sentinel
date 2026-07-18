@@ -341,6 +341,7 @@ export function getDataSources(clinicianId: string, date: string): DataSource[] 
     return [
       { name: 'Whoop', note: 'Synced at 7:15 AM', status: 'fresh' },
       { name: 'Calendar', note: 'Last synced just now', status: 'fresh' },
+      { name: 'EHR', note: 'Last synced a few seconds ago', status: 'fresh' },
     ];
   }
   if (clinicianId === 'okafor') {
@@ -350,12 +351,14 @@ export function getDataSources(clinicianId: string, date: string): DataSource[] 
         ? { name: 'Oura Ring', note: 'Not worn since Jul 16 — wear it to keep insights precise', status: 'stale' }
         : { name: 'Oura Ring', note: 'Synced at 6:05 AM', status: 'fresh' },
       { name: 'Calendar', note: 'Last synced 2 minutes ago', status: 'fresh' },
+      { name: 'EHR', note: 'Last synced a few seconds ago', status: 'fresh' },
     ];
   }
   // chen + roster default
   return [
     { name: 'Apple Watch', note: 'Synced at 6:42 AM', status: 'fresh' },
     { name: 'Calendar', note: 'Last synced 5 seconds ago', status: 'fresh' },
+    { name: 'EHR', note: 'Last synced a few seconds ago', status: 'fresh' },
   ];
 }
 
