@@ -1,67 +1,131 @@
 // lib/api.ts — the single data facade the UI consumes. SIGNATURES ARE FROZEN.
-// The data/score workstream replaces the placeholder internals below with the real
-// seeded engine (lib/data + lib/score + lib/privacy). UI must only import from here.
+// Internals below are the real seeded engine (lib/data + lib/score + lib/privacy),
+// computed once at module load into in-memory maps — this is static seeded data,
+// so there is no reason to recompute per request.
 
 import type {
   AdminProfile, AdminRosterRow, Clinician, DayMetrics, Encounter,
   EventPin, InboxEmail, ScoreDay, ScorePoint,
 } from './types';
 
+import { CHEN, CLINICIANS, OKAFOR, PATEL, ROSTER } from './data/clinicians';
+import { buildChenSeries } from './data/scenario-chen';
+import { buildPatelSeries } from './data/scenario-patel';
+import { buildOkaforSeries } from './data/scenario-okafor';
+import { buildRosterSeries } from './data/roster';
+import { getScheduleFor } from './data/schedule';
+import { getSeededInboxEmails } from './data/inbox';
+import { eventPinsFor } from './score/eventPins';
+import { assemblePatelScore, assembleStandardScore, CHEN_TARGETS, OKAFOR_TARGETS } from './score/build';
+import type { ClinicianScoreData } from './score/build';
+import { scoreDayClamped, toAdminProfile, toAdminRosterRow } from './privacy/projection';
+
 // ————————————————————————————————————————————————————————————————
-// PLACEHOLDER IMPLEMENTATION — enough for the UI to render during parallel dev.
+// Build once, at module load. Deterministic seeded data — identical every run.
 // ————————————————————————————————————————————————————————————————
 
-const chen: Clinician = {
-  id: 'chen', name: 'Maya Chen', credentials: 'MD', role: 'Attending Physician',
-  specialty: 'Emergency Medicine', unit: 'ED',
-  consent: { workload: true, body: true, personal: true },
-  baselines: { hrvRmssd: 45, restingHr: 62, sleepH: 7.5, afterHoursMin: 40, backlog: 2, encounters: 20 },
-};
+const SCORE_DATA = new Map<string, ClinicianScoreData>();
+SCORE_DATA.set('chen', assembleStandardScore(CHEN, buildChenSeries(), CHEN_TARGETS));
+SCORE_DATA.set('patel', assemblePatelScore(PATEL, buildPatelSeries()));
+SCORE_DATA.set('okafor', assembleStandardScore(OKAFOR, buildOkaforSeries(), OKAFOR_TARGETS));
+for (const archetype of ROSTER) {
+  SCORE_DATA.set(archetype.clinician.id, assembleStandardScore(archetype.clinician, buildRosterSeries(archetype)));
+}
 
-const placeholderScore: ScoreDay = {
-  date: '2026-07-18', loadIndex: 81, tier: 'critical', trajectory: 'rising',
-  drivers: [
-    { id: 'after-hours', tier: 'workload', label: 'After-hours charting: 140 min', detail: 'Documentation is spilling far past your shifts.', value: '140 min', deltaVsBaseline: '+250% vs your baseline', severity: 3, spark: [45, 60, 70, 85, 90, 95, 100, 110, 115, 120, 125, 130, 135, 140] },
-    { id: 'hrv', tier: 'body', label: 'HRV 40% below your baseline', detail: 'Your recovery signal has been suppressed for nine days.', value: '27 ms', deltaVsBaseline: '−40% vs your baseline', severity: 3, spark: [44, 42, 41, 38, 35, 33, 32, 31, 30, 29, 29, 28, 28, 27] },
-    { id: 'levo-gap', tier: 'personal', label: 'Levothyroxine gap: 19 days', detail: 'Your refill lapsed exactly as the workload spike began.', value: '19 days', deltaVsBaseline: 'Adherent for 18 months before this', severity: 3 },
-  ],
-  triggers: { leadFired: '2026-07-07', bodyConfirmed: '2026-07-09', personalCatch: '2026-07-18' },
-};
+const CLINICIAN_MAP = new Map<string, Clinician>(CLINICIANS.map((c) => [c.id, c]));
 
-const flatSeries: ScorePoint[] = Array.from({ length: 21 }, (_, i) => {
-  const d = new Date(Date.UTC(2026, 5, 28 + i));
-  const loadIndex = 24 + Math.round((81 - 24) * (i / 20));
-  const tier = loadIndex >= 70 ? 'critical' : loadIndex >= 55 ? 'high' : loadIndex >= 35 ? 'elevated' : 'stable';
-  return { date: d.toISOString().slice(0, 10), loadIndex, tier } as ScorePoint;
-});
+function requireScoreData(id: string): ClinicianScoreData {
+  const data = SCORE_DATA.get(id);
+  if (!data) throw new Error(`Unknown clinician: ${id}`);
+  return data;
+}
 
-export function listClinicians(): Clinician[] { return [chen]; }
-export function getClinician(id: string): Clinician { void id; return chen; }
-export function getScoreDay(id: string, date: string): ScoreDay { void id; return { ...placeholderScore, date }; }
-export function getScoreSeries(id: string): ScorePoint[] { void id; return flatSeries; }
-export function getDayMetrics(id: string, date: string): DayMetrics | null { void id; void date; return null; }
-export function getEventPins(id: string): EventPin[] { void id; return []; }
-export function getSchedule(id: string, date: string): Encounter[] { void id; void date; return []; }
-export function getSeededInbox(): InboxEmail[] { return []; }
+// ————————————————————————————————————————————————————————————————
+// Public facade — signatures frozen by lib/types.ts consumers.
+// ————————————————————————————————————————————————————————————————
+
+export function listClinicians(): Clinician[] {
+  return CLINICIANS;
+}
+
+export function getClinician(id: string): Clinician {
+  const c = CLINICIAN_MAP.get(id);
+  if (!c) throw new Error(`Unknown clinician: ${id}`);
+  return c;
+}
+
+export function getScoreDay(id: string, date: string): ScoreDay {
+  return scoreDayClamped(requireScoreData(id), date);
+}
+
+export function getScoreSeries(id: string): ScorePoint[] {
+  return requireScoreData(id).scoreSeries;
+}
+
+export function getDayMetrics(id: string, date: string): DayMetrics | null {
+  const data = requireScoreData(id);
+  return data.series.find((d) => d.date === date) ?? null;
+}
+
+export function getEventPins(id: string): EventPin[] {
+  return eventPinsFor(id);
+}
+
+export function getSchedule(id: string, date: string): Encounter[] {
+  return getScheduleFor(id, date);
+}
+
+export function getSeededInbox(): InboxEmail[] {
+  return getSeededInboxEmails();
+}
+
 export function getAdminRoster(date: string): AdminRosterRow[] {
-  void date;
-  return [{
-    clinicianId: 'chen', name: 'Maya Chen', credentials: 'MD', unit: 'ED', specialty: 'Emergency Medicine',
-    loadIndex: 81, tier: 'critical', trajectory: 'rising', spark: flatSeries.map((p) => p.loadIndex),
-    visibleDrivers: placeholderScore.drivers.filter((d) => d.tier === 'workload'),
-    lockedFactorCount: 2,
-  }];
+  return CLINICIANS.map((c) => toAdminRosterRow(requireScoreData(c.id), date));
 }
+
 export function getAdminProfile(id: string, date: string): AdminProfile {
-  void id;
-  return {
-    clinician: { id: 'chen', name: 'Maya Chen', credentials: 'MD', unit: 'ED', specialty: 'Emergency Medicine', role: 'Attending Physician' },
-    scoreDay: { ...placeholderScore, date, drivers: placeholderScore.drivers.filter((d) => d.tier === 'workload'), adjustment: undefined },
-    lockedFactorCount: 2,
-    spark: flatSeries.map((p) => p.loadIndex),
-  };
+  return toAdminProfile(requireScoreData(id), date);
 }
+
 /** Compact pre-aggregated context for live LLM prompts — never raw day series. */
 export function getAgentContext(id: string, date: string): Record<string, unknown> {
-  return { clinicianId: id, date, note: 'placeholder — replaced by data workstream' };
+  const data = requireScoreData(id);
+  const clinician = getClinician(id);
+  const scoreDay = scoreDayClamped(data, date);
+
+  const first = data.dates[0];
+  const last = data.dates[data.dates.length - 1];
+  const clampedDate = date < first ? first : date > last ? last : date;
+  const idx = data.dates.indexOf(clampedDate);
+  const window = data.series.slice(Math.max(0, idx - 6), idx + 1);
+
+  const avg = (values: number[]): number =>
+    values.length ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10 : 0;
+  const bodyValues = (pick: (d: DayMetrics) => number | undefined): number[] =>
+    window.map(pick).filter((v): v is number => v !== undefined);
+
+  return {
+    clinicianId: id,
+    date,
+    name: clinician.name,
+    role: clinician.role,
+    specialty: clinician.specialty,
+    unit: clinician.unit,
+    consent: clinician.consent,
+    baselines: clinician.baselines,
+    score: { loadIndex: scoreDay.loadIndex, tier: scoreDay.tier, trajectory: scoreDay.trajectory },
+    triggers: scoreDay.triggers,
+    adjustment: scoreDay.adjustment,
+    topDrivers: scoreDay.drivers.slice(0, 3).map((d) => ({ tier: d.tier, label: d.label, deltaVsBaseline: d.deltaVsBaseline })),
+    last7: {
+      afterHoursMinAvg: avg(window.map((d) => d.workload.afterHoursMin)),
+      noteBacklogAvg: avg(window.map((d) => d.workload.noteBacklog)),
+      encountersAvg: avg(window.map((d) => d.workload.encounters)),
+      consecutiveDaysMax: Math.max(...window.map((d) => d.workload.consecutiveDays)),
+      acuityEventCount: window.reduce((sum, d) => sum + d.workload.acuityEvents.length, 0),
+      hrvRmssdAvg: avg(bodyValues((d) => d.body?.hrvRmssd)),
+      restingHrAvg: avg(bodyValues((d) => d.body?.restingHr)),
+      sleepHAvg: avg(bodyValues((d) => d.body?.sleepH)),
+    },
+  };
 }
