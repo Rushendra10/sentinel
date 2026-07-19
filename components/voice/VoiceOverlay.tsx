@@ -19,13 +19,17 @@ interface SpeechRecognitionLike {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
+  processLocally?: boolean; // Chrome 139+: on-device recognition, no cloud service
   onresult: ((e: SpeechEventLike) => void) | null;
   onend: (() => void) | null;
   onerror: ((e: SpeechErrorLike) => void) | null;
   start: () => void;
   stop: () => void;
 }
-type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+type SpeechRecognitionCtor = (new () => SpeechRecognitionLike) & {
+  available?: (opts: { langs: string[]; processLocally?: boolean }) => Promise<string>;
+  install?: (opts: { langs: string[]; processLocally?: boolean }) => Promise<boolean>;
+};
 
 function getRecognitionCtor(): SpeechRecognitionCtor | undefined {
   if (typeof window === 'undefined') return undefined;
@@ -43,6 +47,12 @@ const MIC_ERROR_TEXT: Record<string, string> = {
   'no-speech': 'Didn’t catch that — hold the mic and speak, or type below.',
   'audio-capture': 'No microphone found — type your message instead.',
 };
+
+function networkErrorText(): string {
+  const isBrave = !!(navigator as unknown as { brave?: unknown }).brave;
+  if (isBrave) return 'Brave blocks cloud speech recognition — open the demo in Google Chrome, or type below.';
+  return 'Cloud speech unreachable — open the demo in Google Chrome on working wifi, or type below.';
+}
 
 interface Message { role: 'user' | 'assistant'; text: string }
 
@@ -106,7 +116,35 @@ export function VoiceOverlay({ open, onClose }: { open: boolean; onClose: () => 
   const liveTranscriptRef = useRef('');
   const pendingSendRef = useRef(false);
   const endGuardRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const localSpeechRef = useRef<'unknown' | 'ready' | 'no'>('unknown');
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Prefer Chrome's ON-DEVICE recognition (139+) when available — it needs no
+  // Google cloud service, so it survives hostile venue wifi and non-Google builds.
+  // Everything here is feature-detected and failure-tolerant; worst case we stay
+  // on the default cloud path exactly as before.
+  useEffect(() => {
+    if (!open || localSpeechRef.current !== 'unknown') return;
+    const Ctor = getRecognitionCtor();
+    if (!Ctor?.available) {
+      localSpeechRef.current = 'no';
+      return;
+    }
+    Ctor.available({ langs: ['en-US'], processLocally: true })
+      .then(async (status) => {
+        if (status === 'available') {
+          localSpeechRef.current = 'ready';
+        } else if (status === 'downloadable' && Ctor.install) {
+          const ok = await Ctor.install({ langs: ['en-US'], processLocally: true }).catch(() => false);
+          localSpeechRef.current = ok ? 'ready' : 'no';
+        } else {
+          localSpeechRef.current = 'no';
+        }
+      })
+      .catch(() => {
+        localSpeechRef.current = 'no';
+      });
+  }, [open]);
 
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -184,6 +222,13 @@ export function VoiceOverlay({ open, onClose }: { open: boolean; onClose: () => 
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
+    if (localSpeechRef.current === 'ready') {
+      try {
+        recognition.processLocally = true;
+      } catch {
+        /* older Chrome: property write may throw — cloud path still works */
+      }
+    }
     recognition.onresult = (e) => {
       let transcript = '';
       for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
@@ -194,7 +239,10 @@ export function VoiceOverlay({ open, onClose }: { open: boolean; onClose: () => 
       pendingSendRef.current = false;
       setIsHolding(false);
       setVoiceState('idle');
-      setMicError(MIC_ERROR_TEXT[e.error ?? ''] ?? 'Mic hiccup — try again, or type below.');
+      const err = e.error ?? '';
+      setMicError(
+        err === 'network' ? networkErrorText() : MIC_ERROR_TEXT[err] ?? 'Mic hiccup — try again, or type below.',
+      );
     };
     recognition.onend = finalizeHold;
     recognitionRef.current = recognition;
